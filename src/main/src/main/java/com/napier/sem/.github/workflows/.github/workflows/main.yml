@@ -1,0 +1,38 @@
+name: Continuous Integration
+
+on: push
+
+jobs:
+  build:
+    name: Build Java and Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Create Docker network and MongoDB
+        run: |
+          docker network create --driver bridge se-methods
+          docker run -d --name mongo-dbserver --network se-methods mongo:4.4
+          sleep 15
+
+      - name: Build with Maven
+        run: mvn package
+
+      - name: Build Docker image
+        run: docker build -t se_methods .
+
+      - name: Run application
+        run: docker run --network se-methods --name semcontainer se_methods
+
+      - name: View logs
+        if: always()
+        run: docker logs semcontainer
