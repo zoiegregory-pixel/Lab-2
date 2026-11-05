@@ -4,15 +4,15 @@ on: push
 
 jobs:
   build:
-    name: Build Java and Docker
+    name: Build Java, Docker and Test MongoDB
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 11
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '11'
           distribution: 'temurin'
@@ -23,3 +23,28 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t se_methods .
+
+      - name: Create Docker network
+        run: docker network create se-methods
+
+      - name: Start MongoDB
+        run: docker run -d --name mongo-dbserver --network se-methods mongo:4.4
+
+      - name: Wait for MongoDB
+        run: |
+          ready=false
+          for i in {1..30}; do
+            if docker exec mongo-dbserver mongo --quiet --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+              ready=true
+              echo "MongoDB is ready"
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "MongoDB did not start"
+            exit 1
+          fi
+
+      - name: Run Java application
+        run: docker run --rm --network se-methods se_methods
